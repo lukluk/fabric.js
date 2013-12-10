@@ -579,6 +579,15 @@
      * @type Boolean
      * @default
      */
+     
+    hasRemoveControl:        false,
+    
+    /**
+     * When set to 'true' , object's have remove at topleft corner
+     * @type Boolean
+     * @default
+     */
+     
     hasBorders:               true,
 
     /**
