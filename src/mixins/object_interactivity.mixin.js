@@ -343,7 +343,7 @@
       ctx.strokeStyle = ctx.fillStyle = this.cornerColor;
 
       // top-left
-      this._drawControl('tl', ctx, methodName,
+      this._drawControl(this.hasRemoveControl ? 'tlx' : 'tl', ctx, methodName,
         left - scaleOffsetX - strokeWidth2 - paddingX,
         top - scaleOffsetY - strokeWidth2 - paddingY);
 
@@ -398,7 +398,19 @@
 
       return this;
     },
-
+    
+    /**
+    * @private 
+    * isRemoveButton : add remove control at left top corner
+    */
+    _isRemoveControl: function(control,ctx){
+      if(control=='tlx'){
+        var size=this.cornerSize-1;
+        ctx.beginPath();ctx.moveTo(1, 1);ctx.lineTo(size, size);ctx.moveTo(1,size);ctx.lineTo(size,1);ctx.stroke();
+      }
+      return false;
+    },
+    
     /**
      * @private
      */
@@ -407,7 +419,7 @@
           sizeY = this.cornerSize / this.scaleY;
 
       if (this.isControlVisible(control)) {
-        isVML || this.transparentCorners || ctx.clearRect(left, top, sizeX, sizeY);
+        isVML || this.transparentCorners || this._isRemoveControl(control,ctx)|| ctx.clearRect(left, top, sizeX, sizeY);
         ctx[methodName](left, top, sizeX, sizeY);
       }
     },
@@ -473,7 +485,8 @@
             mt: true,
             mr: true,
             mb: true,
-            mtr: true
+            mtr: true,
+            tlx:true
         };
       }
       return this._controlsVisibility;
