@@ -1,7 +1,6 @@
 (function(){
 
-  var getPointer = fabric.util.getPointer,
-      degreesToRadians = fabric.util.degreesToRadians,
+  var degreesToRadians = fabric.util.degreesToRadians,
       isVML = typeof G_vmlCanvasManager !== 'undefined';
 
   fabric.util.object.extend(fabric.Object.prototype, /** @lends fabric.Object.prototype */ {
@@ -15,16 +14,14 @@
     /**
      * Determines which corner has been clicked
      * @private
-     * @param {Event} e Event object
-     * @param {Object} offset Canvas offset
+     * @param {Object} pointer The pointer indicating the mouse position
      * @return {String|Boolean} corner code (tl, tr, bl, br, etc.), or false if nothing is found
      */
-    _findTargetCorner: function(e, offset) {
+    _findTargetCorner: function(pointer) {
       if (!this.hasControls || !this.active) return false;
 
-      var pointer = getPointer(e, this.canvas.upperCanvasEl),
-          ex = pointer.x - offset.left,
-          ey = pointer.y - offset.top,
+      var ex = pointer.x,
+          ey = pointer.y,
           xPoints,
           lines;
 
@@ -38,7 +35,8 @@
           continue;
         }
 
-        if (this.get('lockUniScaling') && (i === 'mt' || i === 'mr' || i === 'mb' || i === 'ml')) {
+        if (this.get('lockUniScaling') &&
+           (i === 'mt' || i === 'mr' || i === 'mb' || i === 'ml')) {
           continue;
         }
 
@@ -58,7 +56,7 @@
         // canvas.contextTop.fillRect(lines.rightline.d.x, lines.rightline.d.y, 2, 2);
         // canvas.contextTop.fillRect(lines.rightline.o.x, lines.rightline.o.y, 2, 2);
 
-        xPoints = this._findCrossPoints({x: ex, y: ey}, lines);
+        xPoints = this._findCrossPoints({ x: ex, y: ey }, lines);
         if (xPoints !== 0 && xPoints % 2 === 1) {
           this.__corner = i;
           return i;
@@ -353,7 +351,7 @@
         top - scaleOffsetY - strokeWidth2 - paddingY);
 
       // bottom-left
-      this._drawControl('tr', ctx, methodName,
+      this._drawControl('bl', ctx, methodName,
         left - scaleOffsetX - strokeWidth2 - paddingX,
         top + height + scaleOffsetSizeY + strokeWidth2 + paddingY);
 
@@ -375,7 +373,7 @@
           top + height + scaleOffsetSizeY + strokeWidth2 + paddingY);
 
         // middle-right
-        this._drawControl('mb', ctx, methodName,
+        this._drawControl('mr', ctx, methodName,
           left + width + scaleOffsetSizeX + strokeWidth2 + paddingX,
           top + height/2 - scaleOffsetY);
 
@@ -477,6 +475,7 @@
     _getControlsVisibility: function() {
       if (!this._controlsVisibility) {
         this._controlsVisibility = {
+<<<<<<< HEAD
             tl: true,
             tr: true,
             br: true,
@@ -487,6 +486,17 @@
             mb: true,
             mtr: true,
             tlx:true
+=======
+          tl: true,
+          tr: true,
+          br: true,
+          bl: true,
+          ml: true,
+          mt: true,
+          mr: true,
+          mb: true,
+          mtr: true
+>>>>>>> kangax/master
         };
       }
       return this._controlsVisibility;

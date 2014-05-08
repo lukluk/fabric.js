@@ -8,10 +8,8 @@
      * Initializes all the interactive behavior of IText
      */
     initBehavior: function() {
-      this.initKeyHandlers();
       this.initCursorSelectionHandlers();
       this.initDoubleClickSimulation();
-      this.initHiddenTextarea();
     },
 
     /**
@@ -25,9 +23,9 @@
           _this.selected = true;
         }, 100);
 
-        if (!this._hasCanvasHandlers) {
+        if (this.canvas && !this.canvas._hasITextHandlers) {
           this._initCanvasHandlers();
-          this._hasCanvasHandlers = true;
+          this.canvas._hasITextHandlers = true;
         }
       });
     },
@@ -36,25 +34,18 @@
      * @private
      */
     _initCanvasHandlers: function() {
-      var _this = this;
-
-      this.canvas.on('selection:cleared', function(options) {
-
-        // do not exit editing if event fired
-        // when clicking on an object again (in editing mode)
-        if (options.e && _this.canvas.containsPoint(options.e, _this)) return;
-
-        _this.exitEditing();
+      this.canvas.on('selection:cleared', function() {
+        fabric.IText.prototype.exitEditingOnOthers.call();
       });
 
       this.canvas.on('mouse:up', function() {
-        this.getObjects('i-text').forEach(function(obj) {
+        fabric.IText.instances.forEach(function(obj) {
           obj.__isMousedown = false;
         });
       });
 
-      this.canvas.on('object:selected', function() {
-        fabric.IText.prototype.exitEditingOnOthers.call(this);
+      this.canvas.on('object:selected', function(options) {
+        fabric.IText.prototype.exitEditingOnOthers.call(options.target);
       });
     },
 
@@ -114,15 +105,23 @@
     /**
      * Initializes delayed cursor
      */
-    initDelayedCursor: function() {
-      var _this = this;
+    initDelayedCursor: function(restart) {
+      var _this = this,
+          delay = restart ? 0 : this.cursorDelay;
+
+      if (restart) {
+        this._abortCursorAnimation = true;
+        clearTimeout(this._cursorTimeout1);
+        this._currentCursorOpacity = 1;
+        this.canvas && this.canvas.renderAll();
+      }
       if (this._cursorTimeout2) {
         clearTimeout(this._cursorTimeout2);
       }
       this._cursorTimeout2 = setTimeout(function() {
         _this._abortCursorAnimation = false;
         _this._tick();
-      }, this.cursorDelay);
+      }, delay);
     },
 
     /**
@@ -149,6 +148,7 @@
     selectAll: function() {
       this.selectionStart = 0;
       this.selectionEnd = this.text.length;
+      this.canvas && this.canvas.fire('text:selection:changed', { target: this });
     },
 
     /**
@@ -240,8 +240,9 @@
      * @return {Number} Number of newlines in selected text
      */
     getNumNewLinesInSelectedText: function() {
-      var selectedText = this.getSelectedText();
-      var numNewLines = 0;
+      var selectedText = this.getSelectedText(),
+          numNewLines = 0;
+
       for (var i = 0, chars = selectedText.split(''), len = chars.length; i < len; i++) {
         if (chars[i] === '\n') {
           numNewLines++;
@@ -256,9 +257,9 @@
      * @param {Number} direction: 1 or -1
      */
     searchWordBoundary: function(selectionStart, direction) {
-      var index = selectionStart;
-      var _char = this.text.charAt(index);
-      var reNonWord = /[ \n\.,;!\?\-]/;
+      var index = this._reSpace.test(this.text.charAt(selectionStart)) ? selectionStart - 1 : selectionStart,
+          _char = this.text.charAt(index),
+          reNonWord = /[ \n\.,;!\?\-]/;
 
       while (!reNonWord.test(_char) && index > 0 && index < this.text.length) {
         index += direction;
@@ -275,11 +276,12 @@
      * @param {Number} selectionStart Index of a character
      */
     selectWord: function(selectionStart) {
-      var newSelectionStart = this.searchWordBoundary(selectionStart, -1); /* search backwards */
-      var newSelectionEnd = this.searchWordBoundary(selectionStart, 1); /* search forward */
+      var newSelectionStart = this.searchWordBoundary(selectionStart, -1), /* search backwards */
+          newSelectionEnd = this.searchWordBoundary(selectionStart, 1); /* search forward */
 
       this.setSelectionStart(newSelectionStart);
       this.setSelectionEnd(newSelectionEnd);
+      this.initDelayedCursor(true);
     },
 
     /**
@@ -287,11 +289,12 @@
      * @param {Number} selectionStart Index of a character
      */
     selectLine: function(selectionStart) {
-      var newSelectionStart = this.findLineBoundaryLeft(selectionStart);
-      var newSelectionEnd = this.findLineBoundaryRight(selectionStart);
+      var newSelectionStart = this.findLineBoundaryLeft(selectionStart),
+          newSelectionEnd = this.findLineBoundaryRight(selectionStart);
 
       this.setSelectionStart(newSelectionStart);
       this.setSelectionEnd(newSelectionEnd);
+      this.initDelayedCursor(true);
     },
 
     /**
@@ -306,6 +309,7 @@
 
       this.isEditing = true;
 
+      this.initHiddenTextarea();
       this._updateTextarea();
       this._saveEditingProps();
       this._setEditingProps();
@@ -314,14 +318,17 @@
       this.canvas && this.canvas.renderAll();
 
       this.fire('editing:entered');
+      this.canvas && this.canvas.fire('text:editing:entered', { target: this });
 
       return this;
     },
 
     exitEditingOnOthers: function() {
       fabric.IText.instances.forEach(function(obj) {
-        if (obj === this) return;
-        obj.exitEditing();
+        obj.selected = false;
+        if (obj.isEditing) {
+          obj.exitEditing();
+        }
       }, this);
     },
 
@@ -349,7 +356,6 @@
 
       this.hiddenTextarea.value = this.text;
       this.hiddenTextarea.selectionStart = this.selectionStart;
-      this.hiddenTextarea.focus();
     },
 
     /**
@@ -397,13 +403,15 @@
       this.selectable = true;
 
       this.selectionEnd = this.selectionStart;
-      this.hiddenTextarea && this.hiddenTextarea.blur();
+      this.hiddenTextarea && this.canvas && this.hiddenTextarea.parentNode.removeChild(this.hiddenTextarea);
+      this.hiddenTextarea = null;
 
       this.abortCursorAnimation();
       this._restoreEditingProps();
       this._currentCursorOpacity = 0;
 
       this.fire('editing:exited');
+      this.canvas && this.canvas.fire('text:editing:exited', { target: this });
 
       return this;
     },
@@ -430,8 +438,9 @@
 
         var prevIndex = this.get2DCursorLocation(i).charIndex;
         i--;
-        var index = this.get2DCursorLocation(i).charIndex;
-        var isNewline = index > prevIndex;
+
+        var index = this.get2DCursorLocation(i).charIndex,
+            isNewline = index > prevIndex;
 
         if (isNewline) {
           this.removeStyleObject(isNewline, i + 1);
@@ -460,10 +469,10 @@
       if (this.selectionStart === this.selectionEnd) {
         this.insertStyleObjects(_chars, isEndOfLine, this.copiedStyles);
       }
-      else if (this.selectionEnd - this.selectionStart > 1) {
+      // else if (this.selectionEnd - this.selectionStart > 1) {
         // TODO: replace styles properly
-        console.log('replacing MORE than 1 char');
-      }
+        // console.log('replacing MORE than 1 char');
+      // }
 
       this.selectionStart += _chars.length;
       this.selectionEnd = this.selectionStart;
@@ -475,7 +484,8 @@
       }
 
       this.setCoords();
-      this.fire('text:changed');
+      this.fire('changed');
+      this.canvas && this.canvas.fire('text:changed', { target: this });
     },
 
     /**
@@ -622,7 +632,9 @@
 
         var textLines = this.text.split(this._reNewline),
             textOnPreviousLine = textLines[lineIndex - 1],
-            newCharIndexOnPrevLine = textOnPreviousLine.length;
+            newCharIndexOnPrevLine = textOnPreviousLine
+              ? textOnPreviousLine.length
+              : 0;
 
         if (!this.styles[lineIndex - 1]) {
           this.styles[lineIndex - 1] = { };
